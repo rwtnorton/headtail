@@ -11,9 +11,12 @@ var nFlag uint
 var debugFlag bool
 
 func init() {
-	flag.UintVar(&nFlag, "n", 10, "number of lines")
+	flag.UintVar(&nFlag, "n", 5, "number of lines")
 	flag.BoolVar(&debugFlag, "debug", false, "write debug info to stderr")
 	flag.Parse()
+	if debugFlag {
+		fmt.Fprintf(os.Stderr, "n=%d\n", nFlag)
+	}
 	if nFlag == 0 {
 		os.Exit(0)
 	}
@@ -23,7 +26,8 @@ func main() {
 	var err error
 
 	headLines := make([]string, 0, nFlag)
-	tailLines := make([]string, 0, nFlag)
+	tailLines := make([]*string, 0, nFlag)
+	tailStart := 0
 
 	lineNum := 0
 	scanner := bufio.NewScanner(os.Stdin)
@@ -34,15 +38,22 @@ func main() {
 			os.Exit(1)
 		}
 		line := scanner.Text()
+
 		if uint(lineNum+1) <= nFlag {
 			headLines = append(headLines, line)
 		}
 
 		if uint(len(tailLines)) < nFlag {
-			tailLines = append(tailLines, line)
+			tailLines = append(tailLines, &line)
 		} else {
-			tailLines = append(tailLines[1:], line)
+			tailLines[tailStart] = &line
+			tailStart = (tailStart + 1) % len(tailLines)
 		}
+	}
+
+	// Realign tailLines if necessary.
+	for i := 0; i < tailStart; i++ {
+		rotateLeft(tailLines)
 	}
 
 	// If regions are mutually exclusive, just print each set.
@@ -54,7 +65,7 @@ func main() {
 			fmt.Printf("%s\n", line)
 		}
 		for _, line := range tailLines {
-			fmt.Printf("%s\n", line)
+			fmt.Printf("%s\n", *line)
 		}
 		// There is overlap.  See if everything gathered into the head slice.
 	} else if uint(lineNum) <= nFlag {
@@ -79,7 +90,18 @@ func main() {
 			fmt.Printf("%s\n", line)
 		}
 		for _, line := range tailLines[tailStart:] {
-			fmt.Printf("%s\n", line)
+			fmt.Printf("%s\n", *line)
 		}
 	}
+}
+
+func rotateLeft(slice []*string) {
+	if len(slice) == 0 {
+		return
+	}
+	lead := slice[0]
+	for i := 1; i < len(slice); i++ {
+		slice[i-1] = slice[i]
+	}
+	slice[len(slice)-1] = lead
 }
